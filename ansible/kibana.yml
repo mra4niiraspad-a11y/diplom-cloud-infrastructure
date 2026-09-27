@@ -1,0 +1,29 @@
+---
+- name: Install Kibana
+  hosts: kibana
+  become: yes
+  tasks:
+    - name: Download Kibana deb from Yandex mirror
+      get_url:
+        url: https://mirror.yandex.ru/mirrors/elastic/8/pool/main/k/kibana/kibana-8.17.9-amd64.deb
+        dest: /tmp/kibana.deb
+        mode: '0644'
+
+    - name: Install Kibana
+      apt:
+        deb: /tmp/kibana.deb
+        state: present
+
+    - name: Configure Kibana
+      copy:
+        content: |
+          server.host: 0.0.0.0
+          server.port: 5601
+          elasticsearch.hosts: ["http://elasticsearch.ru-central1.internal:9200"]
+        dest: /etc/kibana/kibana.yml
+
+    - name: Start and enable Kibana
+      service:
+        name: kibana
+        state: started
+        enabled: yes

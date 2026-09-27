@@ -1,0 +1,81 @@
+---
+- name: Install Zabbix Server
+  hosts: zabbix
+  become: yes
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - wget
+          - gnupg
+          - postgresql
+          - postgresql-contrib
+          - python3-psycopg2
+          - php
+          - php-pgsql
+          - php-fpm
+          - php-mbstring
+          - php-gd
+          - php-xml
+          - php-bcmath
+          - php-ldap
+          - libapache2-mod-php
+        state: present
+        update_cache: yes
+
+    - name: Download Zabbix repo deb
+      get_url:
+        url: https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_6.0+ubuntu22.04_all.deb
+        dest: /tmp/zabbix-release.deb
+        mode: '0644'
+
+    - name: Install Zabbix repo
+      apt:
+        deb: /tmp/zabbix-release.deb
+        state: present
+
+    - name: Update apt cache after adding Zabbix repo
+      apt:
+        update_cache: yes
+
+    - name: Install Zabbix server packages
+      apt:
+        name:
+          - zabbix-server-pgsql
+          - zabbix-frontend-php
+          - zabbix-apache-conf
+          - zabbix-sql-scripts
+        state: present
+
+    - name: Start PostgreSQL
+      service:
+        name: postgresql
+        state: started
+        enabled: yes
+
+    - name: Create Zabbix DB user
+      shell: sudo -u postgres psql -c "CREATE USER zabbix WITH PASSWORD 'zabbix' SUPERUSER;" || true
+
+    - name: Create Zabbix database
+      shell: sudo -u postgres createdb -O zabbix -E UTF8 zabbix || true
+
+    - name: Import Zabbix schema
+      shell: sudo -u postgres bash -c "zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | psql zabbix"
+
+    - name: Configure Zabbix server
+      lineinfile:
+        path: /etc/zabbix/zabbix_server.conf
+        regexp: '^DBPassword='
+        line: 'DBPassword=zabbix'
+
+    - name: Restart Zabbix server
+      service:
+        name: zabbix-server
+        state: restarted
+        enabled: yes
+
+    - name: Restart Apache
+      service:
+        name: apache2
+        state: restarted
+        enabled: yes

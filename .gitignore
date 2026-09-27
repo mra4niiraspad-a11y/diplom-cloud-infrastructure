@@ -1,0 +1,33 @@
+# Terraform state
+*.tfstate
+*.tfstate.*
+
+# Terraform internals
+.terraform/
+.terraform.lock.hcl
+
+# Secrets
+*.tfvars
+*.tfvars.bak
+*.auto.tfvars
+current_token.txt
+id_ed25519
+key.json
+json
+
+# Plans
+*.tfplan
+plan.out
+tfplan
+
+# Keys
+*.pem
+*.key
+
+# Root-level duplicates (ansible/ copies are kept)
+/inventory.ini
+/ansible.cfg
+
+# Vendor files
+CHANGELOG.md
+LICENSE

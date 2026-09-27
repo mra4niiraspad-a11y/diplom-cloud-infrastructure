@@ -1,0 +1,65 @@
+---
+- name: Setup nginx + static site on web servers
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Create site directory
+      file:
+        path: /var/www/site
+        state: directory
+        mode: '0755'
+
+    - name: Create index.html
+      copy:
+        dest: /var/www/site/index.html
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head><title>Diploma Site</title></head>
+          <body>
+          <h1>Infrastructure works!</h1>
+          <p>Served by {{ ansible_hostname }}</p>
+          </body>
+          </html>
+        mode: '0644'
+
+    - name: Configure nginx site
+      copy:
+        dest: /etc/nginx/sites-available/site
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              root /var/www/site;
+              index index.html;
+              server_name _;
+              location / {
+                  try_files $uri $uri/ =404;
+              }
+              access_log /var/log/nginx/access.log;
+              error_log /var/log/nginx/error.log;
+          }
+        mode: '0644'
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/site
+        dest: /etc/nginx/sites-enabled/site
+        state: link
+
+    - name: Restart nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: yes

@@ -1,0 +1,6 @@
+{
+  "name": "http-listener",
+  "ports": [80],
+  "protocol": "HTTP",
+  "target_group_refs": ["diploma-tg"]
+}
