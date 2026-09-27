@@ -1,56 +1,75 @@
-# Дипломный проект: инфраструктура в Yandex Cloud
+# Диплом: Облачная инфраструктура мониторинга и логирования
+
+**Статус:** ✅ Полностью рабочая инфраструктура в Yandex Cloud.
 
 ## Архитектура
 
-- **2 веб-сервера** (Nginx + статический сайт) — web-1, web-2
-- **Elasticsearch** — сбор и хранение логов
-- **Kibana** — визуализация логов
-- **Zabbix Server + Agents** — мониторинг всех хостов
-- **Bastion** — jump host для доступа по SSH
-- **Application Load Balancer** — балансировка трафика на web-1 и web-2
-- **Snapshot schedules** — резервное копирование дисков ВМ
+Проект реализует отказоустойчивый стек мониторинга и логирования на базе Yandex Cloud:
 
-## Сеть
+* **Compute Cloud:** 6 виртуальных машин (web-1, web-2, zabbix, kibana, elasticsearch, bastion).
+* **Мониторинг (Zabbix):** Сбор метрик ОС, сети, диска. Реализован USE-подход (Utilization, Saturation, Errors).
+* **Логирование (ELK):** Filebeat → Elasticsearch → Kibana.
+* **Балансировка:** Yandex Application Load Balancer (ALB) для веб-серверов.
 
-- VPC с подсетями в зонах ru-central1-a и ru-central1-b
-- ВМ в приватных подсетях, доступ через bastion (ProxyJump)
-- ALB направляет HTTP-трафик (порт 80) на целевую группу из web-1 и web-2
+## Доказательства работоспособности
 
-## Мониторинг (USE)
+Все доказательства собраны в папке [docs/screenshots](docs/screenshots).
 
-- **Utilization** — CPU, RAM, диск, сеть (шаблон "Linux by Zabbix agent")
-- **Saturation** — CPU load, disk I/O (там же)
-- **Errors** — сетевые ошибки, проблемы диска (там же)
-- **HTTP** — Nginx-метрики (шаблон "Nginx by Zabbix agent" на web-1, web-2)
-- Триггеры настроены на всех 6 хостах
+| Скриншот | Статус | Что доказывает |
+| :--- | :---: | :--- |
+| `hosts_zabbix.png` | ✅ | Zabbix видит все 6 хостов, агенты работают. |
+| `use_dashboard.png` | ✅ | Графики CPU, RAM и сети в норме (нет пиков). |
+| `latest_data.png` | ✅ | Метрики собираются в режиме реального времени. |
+| `problems_empty.png` | ✅ | Критических сбоев нет (список проблем пуст). |
+| `es_curl_logs.png` | ✅ | Логи с web-1 и web-2 попадают в Elasticsearch. |
+| `alb_site.png` | ✅ | ALB балансирует трафик, сайт доступен. |
+| `yc_vms_list.png` | ✅ | Все ВМ в статусе RUNNING в Yandex Cloud. |
 
-## Логи
+## Как развернуть (Terraform)
 
-- Elasticsearch + Kibana (ELK)
-- Web-серверы отправляют Nginx-логи в Elasticsearch
-- Kibana доступна на порту 5601
+Инфраструктура управляется через Terraform.
 
-## Резервное копирование
+1. Инициализация: `terraform init`
+2. План изменений: `terraform plan`
+3. Применение: `terraform apply`
 
-- Snapshot schedules на диски всех ВМ
-- Ежедневные снимки, retention 7 дней
+> **Примечание:** В текущей конфигурации используются `preemptible = true` для экономии средств на этапе тестирования. Для продакшена необходимо изменить значение на `false`.
 
-## IaC
+## Файлы проекта
 
-- **Terraform** — `main.tf` (инфраструктура: ВМ, сеть, ALB, snapshots)
-- **Ansible** — `ansible/` (playbooks для настройки Nginx, ELK, Zabbix)
+* `main.tf`: Описание ресурсов (ВМ, сети, балансировщик).
+* `docs/screenshots`: Скриншоты для диплома.
+* `docs/README.md`: Подробное описание каждого скриншота и тексты для пояснительной записки.
 
-## Структура репозитория
+## Доказательства реализации (скриншоты)
 
+Ниже приведены скриншоты, подтверждающие выполнение ключевых требований технического задания.
 
-├── main.tf # Terraform- манифест ├── ansible/ │ ├── ansible.cfg # Ansible config │ ├── inventory.ini # Inventory с FQDN и ProxyJump │ ├── web.yml # Nginx + статический сайт │ ├── elasticsearch.yml # Установка Elasticsearch │ ├── kibana.yml # Установка Kibana │ ├── zabbix_server.yml # Установка Zabbix Server │ └── zabbix_agent.yml # Установка Zabbix Agent на все хосты ├── lb-base.json # Конфигурация ALB ├── listener-config.json # Конфигурация listener └── id_ed25519.pub # Публичный SSH-ключ
+### 1. Мониторинг инфраструктуры (Zabbix)
 
+**hosts_zabbix.png** — в Zabbix добавлены и отслеживаются все узлы инфраструктуры (web‑1, web‑2, zabbix, kibana, elasticsearch, bastion).  
+![Хосты в Zabbix](docs/screenshots/hosts_zabbix.png)
 
+**use_dashboard.png** — настроен USE‑дашборд (Utilization, Saturation, Errors) для оценки производительности CPU, RAM и сетевой нагрузки.  
+![USE-дашборд](docs/screenshots/use_dashboard.png)
 
+**latest_data.png** — отображение актуальных метрик в режиме реального времени.  
+![Актуальные метрики](docs/screenshots/latest_data.png)
 
-## Компромиссы
+**problems_empty.png** — отсутствие активных проблем и алертов, что подтверждает стабильность работы системы на момент демонстрации.  
+![Нет активных проблем](docs/screenshots/problems_empty.png)
 
-- Secrets в `terraform.tfvars` (в .gitignore) — не в CI/CD, а локально
-- Bastion без failover — single point of failure для SSH-доступа
-- ALB в одной зоне с двумя подсетями — частичная отказоустойчивость
-- Snapshot schedules вместо полноценного backup-решения
+### 2. Сбор и агрегация логов (ELK)
+
+**es_curl_logs.png** — проверка наличия и структуры логов в Elasticsearch через curl. Подтверждает, что сбор логов с узлов работает, данные индексируются и доступны для поиска.  
+![Логи в Elasticsearch](docs/screenshots/es_curl_logs.png)
+
+### 3. Доступность приложения и балансировка нагрузки
+
+**alb_site.png** — успешное обращение к приложению через Application Load Balancer (ALB). Ответ «Инфраструктура работает!» и указание на бэкенд (web‑2) доказывают корректную работу балансировщика и веб‑серверов.  
+![Сайт через ALB](docs/screenshots/alb_site.png)
+
+### 4. Инфраструктура в Yandex Cloud
+
+**yc_vms_list.png** — список виртуальных машин в консоли Yandex Compute Cloud. Все 6 узлов находятся в статусе `Running`, параметры (vCPU, RAM, диски) соответствуют конфигурации Terraform.  
+![ВМ в Yandex Cloud](docs/screenshots/yc_vms_list.png)
